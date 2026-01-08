@@ -1,0 +1,64 @@
+use leptos::{prelude::*, task::spawn_local};
+use tower::tauri_model::StoreType;
+use tower::tauri_web::prelude::*;
+use tower::tauri_web::service::store::async_create_store;
+use tower::tauri_web::AppState;
+
+use super::*;
+
+#[component]
+pub(crate) fn AddFileForm(open: RwSignal<bool>) -> impl IntoView {
+    let app_state = expect_context::<AppState>();
+    let dir_state = expect_context::<PasswordState>();
+    let form = AddFileFormData::new();
+    let op_tiper = OpTiper::new();
+    view! {
+        <form on:submit=move |ev| {
+            ev.prevent_default();
+            let req = form.to_req();
+            spawn_local(async move {
+                let resp = async_create_store(StoreType::Password, &req).await;
+                tip_or(
+                    resp,
+                    op_tiper.0,
+                    |_| {
+                        dir_state.password_resource.refetch();
+                        open.set(false);
+                        app_state.success("新增密码本成功。");
+                    },
+                );
+            });
+        }>
+            <fieldset class="p-4 w-full fieldset">
+                <label class="label">名称</label>
+                <input
+                    type="text"
+                    class="w-full input validator"
+                    minlength="1"
+                    maxlength="50"
+                    required
+                    bind:value=form.label
+                />
+                <p class="validator-hint">必须输入</p>
+                <OpTip content=op_tiper.0 />
+                <button class="mt-4 btn btn-neutral" type="submit">
+                    确定
+                </button>
+            </fieldset>
+        </form>
+    }
+}
+
+struct AddFileFormData {
+    label: RwSignal<String>,
+}
+impl AddFileFormData {
+    fn new() -> Self {
+        Self {
+            label: RwSignal::new("".to_string()),
+        }
+    }
+    fn to_req(&self) -> String {
+        self.label.get_untracked()
+    }
+}
